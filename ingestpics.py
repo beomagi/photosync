@@ -34,6 +34,7 @@ if (LOCALSTORE[-1] != os.sep): LOCALSTORE = LOCALSTORE+os.sep
 
 if (SOURCEPICS[-1] != os.sep): SOURCEPICS = SOURCEPICS+os.sep
 
+
 def lzero(number):
     """add a leading zero"""
     strnum = str(number)
@@ -119,6 +120,7 @@ def copy_files(joblist):
     count = 0
     start_time = time.time()
     timeleft = 999
+    failedcopies = []
     for file, newfile in joblist:
         if os.path.isfile(file):
             count += 1
@@ -129,8 +131,13 @@ def copy_files(joblist):
             print(f"Copying {file} to {newfile} - {count}/{total_files}. ", end="")
             if COPYNEWS:
                 create_directory_if_not_exists(newfile)
-                shutil.copy2(file, newfile)
+                try:
+                    shutil.copy2(file, newfile)
+                except Exception as e:
+                    print(f"{RED}Error copying file {file}: {e}{RESET}")
+                    failedcopies.append((file, newfile))
             print(f"est. {timeleft:.2f} seconds")
+    return failedcopies
 
 
 def adler32sum(filename, blocksize=65536):
@@ -185,11 +192,18 @@ def remove_files_from_source(joblist):
     else:
         print(f"Skipping removal of {len(joblist)} files from source directory")
         return
+    failed_files=[]
     for file, newfile in joblist:
         if os.path.isfile(file):
             print(f"Removing {file}")
             if REMOVEONCOPY:
-                os.remove(file)
+                try:
+                    os.remove(file)
+                except Exception as e:
+                    print(f"{RED}Error removing file {file}: {e}{RESET}")
+                    failed_files.append((file, newfile))
+                    continue
+    return failed_files
 
 
 if __name__ == "__main__":
@@ -197,9 +211,16 @@ if __name__ == "__main__":
     newfilelist = get_files(SOURCEPICS)
     date_dict = create_date_dict(newfilelist)
     job_list = create_jobs(newfilelist, date_dict)
-    copy_files(job_list)
+    failed_copies = copy_files(job_list)
+    if len(failed_copies) > 0:
+        print(f"{RED}Some files failed to copy{RESET}")
+        failed_copies = copy_files(job_list) #try again
+        if len(failed_copies) > 0:
+            print(f"{RED}Some files still failed to copy. Retrying...{RESET}")
+            for file, newfile in failed_copies:
+                print(f"{RED}Failed copy:{RESET} {file} -> {newfile}")            
     failed_files, matched_files = compare_files_in_joblist(job_list)
-    remove_files_from_source(matched_files) # Only remove files that matched
+    failed_remove_files = remove_files_from_source(matched_files) # Only remove files that matched
     if len(failed_files) > 0:
         print(f"{RED}Some files failed to copy or compare{RESET}")
         for file, newfile in failed_files:
@@ -207,6 +228,13 @@ if __name__ == "__main__":
         print("These files have not been removed from the source directory")
     else:
         print(f"{GREEN}All files copied and compared successfully{RESET}")
+    if len(failed_remove_files) > 0:
+        print(f"{RED}Some files failed to remove from source directory, retrying...{RESET}")
+        failed_remove_files2 = remove_files_from_source(failed_remove_files)
+        if len(failed_remove_files2) > 0: #2nd try
+            print(f"{RED}Some files failed to remove from source directory{RESET}")
+            for file, newfile in failed_remove_files2:
+                print(f"{RED}Failed to remove:{RESET} {file}")
     global_end_time = time.time()
     global_elapsed_time = global_end_time - global_start_time
     print(f"Total time taken: {global_elapsed_time:.2f} seconds")
