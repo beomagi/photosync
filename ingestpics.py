@@ -2,7 +2,7 @@
 """
 This will carry out the following tasks:
 1. Check for new files in the SOURCEPICS directory
-2. intent is to copy source file, to new file with path containing creation yyyy\mm\dd, and rename the file with creation time.
+2. intent is to copy source file, to new file with path containing creation yyyy\\mm\\dd, and rename the file with creation time.
 3. as RAW and JPG files can be created at dofferent times, we'll create a dict with file basename+prefix as key, 
 2. for each file prefix, create a dict with prefix:date hh-mm-ss
    The same date will be used for all file types - so the raw, jpg, etc will all have the same timestamp
